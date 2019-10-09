@@ -1,5 +1,5 @@
-#ifndef VALUE_H
-#define VALUE_H
+#ifndef Value_H
+#define Value_H
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -36,6 +36,12 @@ struct Value {
 };
 
 extern Value *NIL;
+
+Value *reg_alloc();
+void reg_unalloc(Value *value);
+
+void reg_view_alloc();
+void reg_show_usage();
 
 Value *_new_Value(int type);
 void Value_unlink(Value *thiz);

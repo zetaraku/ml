@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=c99 -DDEBUG -I ./src/include
+CFLAGS = -std=gnu99 -I ./src	# -DDEBUG
 LDFLAGS = -L ./libs
 LIBS = -lm
 
@@ -16,7 +16,7 @@ GENDIR = gen
 OBJDIR = obj
 
 TARGET = ml
-SRC_OBJS = ml.o allocator.o context_stack.o value.o sym_table.o utils.o
+SRC_OBJS = ml.o Value.o SymbolTable.o FuncExecContext.o eval.o utils.o
 GEN_OBJS = lex.yy.o ml.tab.o
 SRC_OBJECTS = $(addprefix $(OBJDIR)/, $(SRC_OBJS))
 GEN_OBJECTS = $(addprefix $(OBJDIR)/, $(GEN_OBJS))

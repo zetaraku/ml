@@ -4,14 +4,15 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
-#include "allocator.h"
-#include "context_stack.h"
-#include "value.h"
-#include "utils.h"
+#include "include/FuncExecContext.h"
+#include "include/Value.h"
+#include "include/utils.h"
 #define loop while (true)
 #define once for (bool b = false; !b; b = true)
 
 extern int yyparse();
+
+bool interactive = false;
 
 Value *eval_prog(Value *prog) {
 	Value *retv = NIL;
@@ -23,67 +24,67 @@ Value *eval_prog(Value *prog) {
 			Value_unlink(retv);
 			retv = Value__eval(v);
 		}
-	} POP_EXEC_CTX();
+	} ctx = POP_EXEC_CTX();
 	return retv;
 }
 
-int main(int argc, const char **argv) {
-	Value *prog = NULL;
+void repl(Value *val) {
+	if (!interactive)
+		return;
+	Value *retv = Value__eval(val);
+	Value_print(retv); putchar('\n');
+}
 
-	setbuf(stdout, NULL);
-
+int interpret() {
 	_Value__initializeNIL(); {
 		FuncExecContext *ctx = new_FuncExecContext(NULL);
-		PUSH_EXEC_CTX(ctx); {
-			yyparse(NULL);
-		} POP_EXEC_CTX();
+		PUSH_EXEC_CTX(ctx); once {
+			Value *prog = NULL;
+			int parse_status = yyparse(&prog);
 
-		// reg_show_usage();
-		// reg_view_alloc();
+			if (parse_status != 0)
+				return parse_status;
+
+			#ifdef DEBUG
+				puts("=======v     prog     v=======");
+				Value_print(prog); putchar('\n');
+				puts("=======^     prog     ^=======");
+				reg_show_usage();
+
+				puts("=======v    output    v=======");
+			#endif
+
+			Value *retv = eval_prog(prog);
+
+			#ifdef DEBUG
+				puts("=======^    output    ^=======");
+				reg_show_usage();
+			#endif
+
+			// cleanup
+			Value_unlink(retv);
+			Value_unlink(prog);
+		} ctx = POP_EXEC_CTX();
+
+		#ifdef DEBUG
+			reg_show_usage();
+			reg_view_alloc();
+		#endif
 	} _Value__releaseNIL();
 
 	return 0;
 }
 
-int main2(int argc, const char **argv) {
-	Value *prog = NULL;
+int main(int argc, const char **argv) {
+	setbuf(stdout, NULL);
 
-	_Value__initializeNIL(); {
-		FuncExecContext *ctx = new_FuncExecContext(NULL);
-		PUSH_EXEC_CTX(ctx); {
-			once {
-				int parse_status = yyparse(&prog);
+	for (size_t i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-i") == 0) {
+			interactive = true;
+		} else {
+			freopen(argv[i], "r", stdin);
+		}
+	}
 
-				if (parse_status != 0)
-					break;
-
-				puts("=======v     prog     v=======");
-				Value_print(prog); putchar('\n');
-				puts("=======^     prog     ^=======");
-
-				reg_show_usage();
-
-				puts("=======v    output    v=======");
-				Value *retv = eval_prog(prog);
-				puts("=======^    output    ^=======");
-
-				reg_show_usage();
-
-				puts("=======v    retval    v=======");
-				Value_print(retv); putchar('\n');
-				puts("=======^    retval    ^=======");
-
-				reg_show_usage();
-
-				// cleanup
-				Value_unlink(retv);
-				Value_unlink(prog);
-			}
-		} POP_EXEC_CTX();
-
-		// reg_show_usage();
-		// reg_view_alloc();
-	} _Value__releaseNIL();
-
-	return 0;
+	return interpret();
 }

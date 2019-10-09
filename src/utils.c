@@ -1,8 +1,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <assert.h>
-#include "value.h"
-#include "utils.h"
+#include "include/Value.h"
+#include "include/utils.h"
 
 Cons Cons__of(Value *left, Value *right) {
 	Cons cons; {

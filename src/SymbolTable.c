@@ -1,26 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include "value.h"
-#include "sym_table.h"
-
-struct KVPair;
-typedef struct KVPair KVPair;
-struct KVPair {
-	void *key;
-	void *value;
-};
-
-struct Node;
-typedef struct Node Node;
-struct Node {
-	void *datap;
-	Node *next;
-};
-
-struct SymTable {
-	Node *dummy_head;
-};
+#include "include/Value.h"
+#include "include/SymbolTable.h"
 
 Node *new_Node(void *datap);
 void delete_Node(Node *thiz);
@@ -47,12 +29,12 @@ void delete_KVPair(KVPair *thiz) {
 	free(thiz);
 }
 
-SymTable *new_SymTable() {
-	SymTable *thiz = (SymTable *)malloc(sizeof(SymTable));
+SymbolTable *new_SymbolTable() {
+	SymbolTable *thiz = (SymbolTable *)malloc(sizeof(SymbolTable));
 	thiz->dummy_head = new_Node(NULL);
 	return thiz;
 }
-void delete_SymTable(SymTable *thiz) {
+void delete_SymbolTable(SymbolTable *thiz) {
 	for (
 		Node *node = thiz->dummy_head->next, *next;
 		node != NULL;
@@ -68,7 +50,7 @@ void delete_SymTable(SymTable *thiz) {
 	free(thiz->dummy_head);
 	free(thiz);
 }
-void SymTable_printout(SymTable *thiz) {
+void SymbolTable_printout(SymbolTable *thiz) {
 	printf("[%p]", thiz->dummy_head);
 	for (
 		Node *curr = thiz->dummy_head->next;
@@ -81,10 +63,10 @@ void SymTable_printout(SymTable *thiz) {
 	}
 	putchar('\n');
 }
-void SymTable_insert(SymTable *thiz, Value *key, Value *val) {
+void SymbolTable_insert(SymbolTable *thiz, Value *key, Value *val) {
 	assert(key->type == TYPE_SYMBOL);
 	#ifdef DEBUG
-		printf("SymTable_insert @%p:\n", thiz);
+		printf("SymbolTable_insert @%p:\n", thiz);
 		printf("key: ");
 		Value_print(key);
 		putchar('\n');
@@ -126,10 +108,10 @@ void SymTable_insert(SymTable *thiz, Value *key, Value *val) {
 		}
 	}
 }
-Value *SymTable_lookup(SymTable *thiz, Value *key) {
+Value *SymbolTable_lookup(SymbolTable *thiz, Value *key) {
 	assert(key->type == TYPE_SYMBOL);
 	#ifdef DEBUG
-		printf("SymTable_lookup @%p: %s\n", thiz, Value_getSymbol(key));
+		printf("SymbolTable_lookup @%p: %s\n", thiz, Value_getSymbol(key));
 	#endif
 
 	for (
@@ -142,7 +124,7 @@ Value *SymTable_lookup(SymTable *thiz, Value *key) {
 		Value *v = (Value *)kv->value;
 		if (strcmp(Value_getSymbol(k), Value_getSymbol(key)) == 0) {
 			#ifdef DEBUG
-				printf("SymTable_lookup found: ");
+				printf("SymbolTable_lookup found: ");
 					Value_print(v);
 				putchar('\n');
 			#endif
@@ -152,10 +134,10 @@ Value *SymTable_lookup(SymTable *thiz, Value *key) {
 
 	return NULL;
 }
-bool SymTable_delete(SymTable *thiz, Value *key) {
+bool SymbolTable_delete(SymbolTable *thiz, Value *key) {
 	assert(key->type == TYPE_SYMBOL);
 	#ifdef DEBUG
-		printf("SymTable_delete @%p: %s\n", thiz, Value_getSymbol(key));
+		printf("SymbolTable_delete @%p: %s\n", thiz, Value_getSymbol(key));
 	#endif
 
 	Node *prev = thiz->dummy_head;

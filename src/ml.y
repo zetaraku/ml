@@ -1,13 +1,15 @@
 %{
 	#include <stdio.h>
-	#include "context_stack.h"
-	#include "value.h"
-	#include "utils.h"
+	#include "include/FuncExecContext.h"
+	#include "include/Value.h"
+	#include "include/utils.h"
 
 	extern int yylex();
 	void yyerror(Value **prog, const char *s) {
 		fprintf(stderr, "yyerror: %s\n", s);
 	}
+
+	void repl(Value *val);
 %}
 
 %error-verbose
@@ -20,35 +22,32 @@
 	struct Value *value;
 }
 
-%start Program_CLI
+%start Program
 %token UNKNOWN
 %token '(' ')'
 %token <strval> ID
 %token <boolval> BOOLLIT
 %token <numval> NUMLIT
-%type <value> Program Exp_list Exp Program_CLI Outer_Exp_list
+%type <value> Program Outer_Exp_list Exp_list Exp
 
 %%
 
 Program:
-	Exp_list			{*prog_ptr = $1; YYACCEPT;}
+	Outer_Exp_list		{*prog_ptr = $1; YYACCEPT;}
 ;
 
-Program_CLI:
-	Outer_Exp_list
-;
 Outer_Exp_list:
-	Exp {
-		Value *retv = Value__eval($1);
-		Value_print(retv); putchar('\n');
-	} Outer_Exp_list
+	Exp					{repl($1);}
+	Outer_Exp_list		{$$ = Value__fromCons(Cons__of($1, $3));}
 	| /* lambda */		{$$ = NIL;}
 ;
 
 Exp_list:
-	Exp Exp_list		{$$ = Value__fromCons(Cons__of($1, $2));}
+	Exp
+	Exp_list			{$$ = Value__fromCons(Cons__of($1, $2));}
 	| /* lambda */		{$$ = NIL;}
 ;
+
 Exp:
 	'(' Exp_list ')'	{$$ = $2;}
 	| ID				{$$ = Value__fromSymbol($1);}

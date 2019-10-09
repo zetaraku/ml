@@ -3,14 +3,55 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include "allocator.h"
-#include "context_stack.h"
-#include "value.h"
-#include "utils.h"
+#include "include/FuncExecContext.h"
+#include "include/Value.h"
+#include "include/utils.h"
 #define TRUE_TEXT "#t"
 #define FALSE_TEXT "#f"
+#define MAX_ALLOCATED_VALUE (4096)
+
+Value *allocated_value[MAX_ALLOCATED_VALUE]; size_t allocated_value_size = 0;
+int val_allocated = 0, val_freed = 0;
 
 Value *NIL = NULL;
+
+Value *reg_alloc() {
+	assert(allocated_value_size < MAX_ALLOCATED_VALUE && "MAX_ALLOCATED_VALUE exceed.");
+
+	Value *value = (Value *) malloc(sizeof(Value));
+
+	allocated_value[allocated_value_size++] = value;
+	val_allocated++;
+
+	return value;
+}
+
+void reg_unalloc(Value *value) {
+	for (size_t i = 0; i < allocated_value_size; i++) {
+		if (allocated_value[i] == value) {
+			allocated_value[i] = allocated_value[allocated_value_size-1];
+			allocated_value_size--;
+
+			free(value);
+			val_freed++;
+
+			return;
+		}
+	}
+	assert(false);
+}
+
+void reg_view_alloc() {
+	printf("unfreed:\n");
+	for (size_t i = 0; i < allocated_value_size; i++)
+		_Value_print_raw(allocated_value[i]);
+}
+
+void reg_show_usage() {
+	printf("allocated: %d, freed: %d, unfreed: %d\n",
+		val_allocated, val_freed, val_allocated - val_freed
+	);
+}
 
 void _Value__initializeNIL() {
 	assert(NIL == NULL);
@@ -193,228 +234,4 @@ Value *Value_copy(Value *thiz) {
 		return Value__fromCons(thiz->_);
 	}
 	assert(false && "TypeError: this type is unavailible for cloning.");
-}
-
-static Value *func_call(Value *func, Value *argument_list);
-Value *Value__eval(Value *value) {
-	if (false) {
-		;
-	} else if (value->type == TYPE_CONS) {	// function call / macro call
-		if (value == NIL)
-			return NIL;
-
-		Value *opvalue = List__getValueAt(value, 0);
-		if (opvalue->type == TYPE_SYMBOL) {
-			Symbol op_name = Value_getSymbol(opvalue);
-			if (false) {
-				;
-			} else if (strcmp(op_name, "list") == 0) {
-				Value *ret_dummy_head = Value__fromCons(Cons__of(NIL, NIL));
-				Value *ret_current_node = ret_dummy_head;
-
-				// eval
-				Value *li = ListIterator_from(value->_.right), *v;
-				while ((v = ListIterator_next(&li)) != NULL) {
-					ret_current_node = ret_current_node->_.right =
-						Value__fromCons(Cons__of(
-							Value__eval(v), NIL
-						));
-				}
-
-				Value *ret = ret_dummy_head->_.right;
-				Value_unlink(ret_dummy_head);
-
-				return ret;
-			} else if (strcmp(op_name, "+") == 0) {
-				Num num = 0;
-				for (Value *v=value->_.right; v!=NIL; v=v->_.right)
-					num += Value__extractNum(Value__eval(v->_.left));
-				return Value__fromNum(num);
-			} else if (strcmp(op_name, "-") == 0) {
-				Num num =
-					  Value__extractNum(Value__eval(List__getValueAt(value, 1)))
-					- Value__extractNum(Value__eval(List__getValueAt(value, 2)))
-				;
-				return Value__fromNum(num);
-			} else if (strcmp(op_name, "*") == 0) {
-				Num num = 1;
-				for (Value *v=value->_.right; v!=NIL; v=v->_.right)
-					num *= Value__extractNum(Value__eval(v->_.left));
-				return Value__fromNum(num);
-			} else if (strcmp(op_name, "/") == 0) {
-				Num num =
-					  Value__extractNum(Value__eval(List__getValueAt(value, 1)))
-					/ Value__extractNum(Value__eval(List__getValueAt(value, 2)))
-				;
-				return Value__fromNum(num);
-			} else if (strcmp(op_name, "mod") == 0) {
-				Num num =
-					  Value__extractNum(Value__eval(List__getValueAt(value, 1)))
-					% Value__extractNum(Value__eval(List__getValueAt(value, 2)))
-				;
-				return Value__fromNum(num);
-			} else if (strcmp(op_name, ">") == 0) {
-				Bool boolean =
-					  Value__extractNum(Value__eval(List__getValueAt(value, 1)))
-					> Value__extractNum(Value__eval(List__getValueAt(value, 2)))
-				;
-				return Value__fromBool(boolean);
-			} else if (strcmp(op_name, "<") == 0) {
-				Bool boolean =
-					  Value__extractNum(Value__eval(List__getValueAt(value, 1)))
-					< Value__extractNum(Value__eval(List__getValueAt(value, 2)))
-				;
-				return Value__fromBool(boolean);
-			} else if (strcmp(op_name, "=") == 0) {
-				Bool boolean =
-					   Value__extractNum(Value__eval(List__getValueAt(value, 1)))
-					== Value__extractNum(Value__eval(List__getValueAt(value, 2)))
-				;
-				return Value__fromBool(boolean);
-			} else if (strcmp(op_name, "and") == 0) {		// macro
-				Bool boolean = true;
-				for (Value *v=value->_.right; v!=NIL; v=v->_.right) {
-					boolean = boolean && Value__extractBool(Value__eval(v->_.left));
-					if (!boolean)
-						break;
-				}
-				return Value__fromBool(boolean);
-			} else if (strcmp(op_name, "or") == 0) {			// macro
-				Bool boolean = false;
-				for (Value *v=value->_.right; v!=NIL; v=v->_.right) {
-					boolean = boolean || Value__extractBool(Value__eval(v->_.left));
-					if (boolean)
-						break;
-				}
-				return Value__fromBool(boolean);
-			} else if (strcmp(op_name, "not") == 0) {
-				Bool boolean = !Value__extractBool(Value__eval(List__getValueAt(value, 1)));
-				return Value__fromBool(boolean);
-			// } else if (strcmp(op_name, "print-num") == 0) {
-			// 	int num = Value__extractNum(Value__eval(List__getValueAt(value, 1)));
-			// 	printf("%d\n", num);
-			// 	return NIL;
-			// } else if (strcmp(op_name, "print-bool") == 0) {
-			// 	Bool boolean = Value__extractBool(Value__eval(List__getValueAt(value, 1)));
-			// 	printf("%s\n", boolean ? "#t" : "#f");
-			// 	return NIL;
-			} else if (strcmp(op_name, "print") == 0) {
-				for (Value *li=value->_.right; li!=NIL; li=li->_.right) {
-					Value *val = Value__eval(li->_.left);
-					Value_print(val);
-					putchar('\n');
-					Value_unlink(val);
-				}
-				return NIL;
-			} else if (strcmp(op_name, "if") == 0) {			// macro
-				Bool boolean = Value__extractBool(Value__eval(List__getValueAt(value, 1)));
-				if (boolean)
-					return Value__eval(List__getValueAt(value, 2));
-				else
-					return Value__eval(List__getValueAt(value, 3));
-			} else if (strcmp(op_name, "quote") == 0) {												// macro
-				return Value_copy(List__getValueAt(value, 1));//?
-			} else if (strcmp(op_name, "lambda") == 0) {
-				Value *func = Value_copy(value);
-				assert(List__isList(func));
-				func->_._closure = CURRENT_EXEC;
-				return func;
-			} else if (strcmp(op_name, "let") == 0) {		// macro
-				Value *def_list = List__getValueAt(value, 1);
-
-				Value *retv = NIL;
-
-				FuncExecContext *ctx = new_FuncExecContext(CURRENT_EXEC);
-				PUSH_EXEC_CTX(ctx); {
-					Value *dli = ListIterator_from(def_list), *dv;
-					while ((dv = ListIterator_next(&dli)) != NULL) {
-						Value *v;
-						SymTable_insert(ctx->symTable,
-							List__getValueAt(dv, 0),
-							v=Value__eval(List__getValueAt(dv, 1))
-						);
-						Value_unlink(v);
-					}
-
-					Value *li=ListIterator_from(value->_.right->_.right), *v;
-					while ((v = ListIterator_next(&li)) != NULL) {
-						Value_unlink(retv);
-						retv = Value__eval(v);
-					}
-				} POP_EXEC_CTX();
-
-				return retv;
-			} else if (strcmp(op_name, "define") == 0) {	// not recommend
-				Value *v;
-				SymTable_insert(CURRENT_EXEC->symTable,
-					List__getValueAt(value, 1),
-					v=Value__eval(List__getValueAt(value, 2))
-				);
-				Value_unlink(v);
-				return NIL;
-			} else {								// symbol function call
-				Value *funcv = FuncExecContext_deref(CURRENT_EXEC, opvalue);
-				Value *retv = func_call(funcv, value->_.right);
-				Value_unlink(funcv);
-				return retv;
-			}
-		} else if (opvalue->type == TYPE_CONS) {	// lambda funcion call
-			Value *funcv = Value__eval(opvalue);
-			Value *retv = func_call(funcv, value->_.right);
-			Value_unlink(funcv);
-			return retv;
-		} else {
-			assert(0 && "TypeError: Head is not Function.");
-		}
-	} else if (value->type == TYPE_SYMBOL) {
-		return FuncExecContext_deref(CURRENT_EXEC, value);
-	} else if (value->type == TYPE_BOOL) {
-		return Value_copy(value);
-	} else if (value->type == TYPE_NUM) {
-		return Value_copy(value);
-	}
-}
-
-static Value *func_call(Value *func, Value *argument_list) {
-	#ifdef DEBUG
-	{
-		printf("calling function:\n");
-			Value_print(func);
-		putchar('\n');
-		printf("with arguments:\n");
-			Value_print(argument_list);
-		putchar('\n');
-	}
-	#endif
-
-	Value *param_list = List__getValueAt(func, 1);
-
-	assert(List__isList(param_list));
-	assert(List__isList(argument_list));
-
-
-	FuncExecContext *ctx = new_FuncExecContext(func->_._closure);
-
-	// evaluate arguments and fill into parameters
-	Value *pli = ListIterator_from(param_list), *pv;
-	Value *ali = ListIterator_from(argument_list), *av;
-	while ((pv = ListIterator_next(&pli)) != NULL) {
-		av = ListIterator_next(&ali);
-		SymTable_insert(ctx->symTable,
-			pv, Value__eval(av != NULL ? av : NIL)
-		);
-	}
-
-	Value *retv = NIL;
-	PUSH_EXEC_CTX(ctx); {
-		// evaluate each list item of function body
-		Value *body_list = func->_.right->_.right;
-		Value *li = ListIterator_from(body_list), *v;
-		while ((v = ListIterator_next(&li)) != NULL) {
-			Value_unlink(retv);
-			retv = Value__eval(v);
-		}
-	} POP_EXEC_CTX();
-
-	return retv;
 }
